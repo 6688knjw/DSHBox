@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:
+    inputs:
+      variant:
+        description: '构建变体'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
 
 jobs:
   build:
@@ -78,11 +87,11 @@ jobs:
       - name: Run lint
         run: ./gradlew lintDebug --stacktrace
 
-      - name: Assemble debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Assemble APK
+        run: ./gradlew assemble${{ inputs.variant == 'release' && 'Release' || 'Debug' }} --stacktrace
 
-      - name: Upload debug APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: dshapp-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: dshapp-${{ inputs.variant || 'debug' }}-apk
+          path: app/build/outputs/apk/${{ inputs.variant || 'debug' }}/app-${{ inputs.variant || 'debug' }}.apk
