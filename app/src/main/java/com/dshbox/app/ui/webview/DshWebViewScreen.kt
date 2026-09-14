@@ -85,6 +85,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.dshbox.app.BuildConfig
 import com.dshbox.app.R
+import com.dshbox.app.common.DshUrls
 import com.dshbox.app.common.LogRedactor
 import com.dshbox.app.sandbox.DshState
 import java.io.File
@@ -562,15 +563,7 @@ internal class DshWebContainer(
     }
 }
 
-/**
- * 在 [base] 上追加 DSH launchToken 查询参数（`?token=<值>`）。
- * 旧版 DSH / token 未就绪时原样返回；token 为 base64url 字符集（A-Za-z0-9_-），
- * 无需 URL 编码。
- */
-private fun webUrlWithToken(base: String, token: String?): String {
-    if (token == null || token.isEmpty() || base.contains("token=")) return base
-    return base + (if (base.contains('?')) "&" else "?") + "token=" + token
-}
+
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -700,7 +693,7 @@ fun DshWebViewScreen(
             if (token != null && dshState == DshState.READY) {
                 val wv = webView
                 if (wv != null) {
-                    wv.loadUrl(webUrlWithToken(url, token))
+                    wv.loadUrl(DshUrls.withLaunchToken(url, token))
                 }
             }
         }
@@ -719,7 +712,7 @@ fun DshWebViewScreen(
                 factory = { ctx ->
                     DshWebContainer(
                         context = ctx,
-                        url = webUrlWithToken(url, dshLaunchToken),
+                        url = DshUrls.withLaunchToken(url, dshLaunchToken),
                         onProgress = { loadProgress = it },
                         onPageStarted = {
                             loadProgress = 0

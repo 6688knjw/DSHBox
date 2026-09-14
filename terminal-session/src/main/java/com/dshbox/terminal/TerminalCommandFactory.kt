@@ -35,8 +35,13 @@ object TerminalCommandFactory {
         add("--bind=/proc")
         add("--bind=/dev")
         // L1 node layer: Node is a separate layer bound at the guest /usr/local
-        // (so node/npm on PATH); dsh layer is bound by the DSH proot command.
+        // (so node/npm on PATH). L2 DSH layer is bound the same way the DSH
+        // PRoot process does, so the interactive terminal can run `dsh`.
         if (paths.nodeDir.isDirectory) add("--bind=${paths.nodeDir.absolutePath}:/usr/local")
+        val dshDir = paths.dshDir
+        if (dshDir != null && dshDir.isDirectory) {
+            add("--bind=${dshDir.absolutePath}:/opt/dshapp/runtime")
+        }
         // Shadow kernel-restricted /proc files (Android 16 SELinux denies
         // /proc/stat etc. to untrusted_app) with readable fabricated sources.
         addAll(extraBinds)

@@ -19,13 +19,15 @@ object TerminalEnvFactory {
         "HOME=/root",
         "USER=root",
         "LOGNAME=root",
-        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/system/bin:/system/xbin",
+        "PATH=/opt/dshapp/runtime/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/system/bin:/system/xbin",
         "SHELL=/usr/bin/bash",
         "TERM=xterm-256color",
         "LANG=C.UTF-8",
         "COLORTERM=truecolor",
         "TMPDIR=/tmp",
         "PWD=/root",
+        "DSH_HOME=/root/projects/.dsh",
+        "DSH_PERMISSION_MODE=danger-full-access",
     )
 
     /** Environment for the failsafe Android shell (no clearenv-hostile deps). */

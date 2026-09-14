@@ -26,6 +26,7 @@ import com.dshbox.app.util.BackgroundOps
 import com.dshbox.app.R
 import com.dshbox.app.common.AppResult
 import com.dshbox.app.common.Constants
+import com.dshbox.app.common.DshUrls
 import com.dshbox.app.sandbox.BundledRuntimeInstaller
 import com.dshbox.app.sandbox.DshState
 import com.dshbox.app.sandbox.SandboxState
@@ -74,6 +75,11 @@ class SandboxService : Service() {
         }
         serviceScope.launch {
             sandboxManager.dshState.collectLatest { state ->
+                updateNotification()
+            }
+        }
+        serviceScope.launch {
+            sandboxManager.dshLaunchToken.collectLatest {
                 updateNotification()
             }
         }
@@ -533,9 +539,13 @@ class SandboxService : Service() {
             else -> ctx.getString(R.string.notify_dsh_other)
         }
         val contentTitle = "$sandboxText · $dshText"
-        val contentText = Constants.DSH_BASE_URL
+        val openUrl = DshUrls.withLaunchToken(
+            Constants.DSH_BASE_URL,
+            sandboxManager.dshLaunchToken.value,
+        )
+        val contentText = openUrl
 
-        val openIntent = Intent(Intent.ACTION_VIEW, Uri.parse(Constants.DSH_BASE_URL))
+        val openIntent = Intent(Intent.ACTION_VIEW, Uri.parse(openUrl))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val openPending = PendingIntent.getActivity(
             this,

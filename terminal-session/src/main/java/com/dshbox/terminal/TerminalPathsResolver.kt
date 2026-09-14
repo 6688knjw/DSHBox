@@ -50,6 +50,7 @@ object TerminalPathsResolver {
             nativeLibDir = libDir,
             debianRootfs = rootfs,
             nodeDir = nodeLayer,
+            dshDir = File(runtimeCurrent, "dsh"),
             workspaceBind = File(appFilesDir, "user-data"),
             prootTmpDir = prootTmpDir,
             failsafeHome = failsafeHome,

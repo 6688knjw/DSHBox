@@ -12,12 +12,13 @@ class TerminalCommandFactoryTest {
     @get:Rule
     val tmp = TemporaryFolder()
 
-    private fun paths(): TerminalPaths = TerminalPaths(
+    private fun paths(withDsh: Boolean = false): TerminalPaths = TerminalPaths(
         prootBinary = tmp.newFile("libproot.so"),
         prootLoader = tmp.newFile("libproot-loader.so"),
         nativeLibDir = tmp.newFolder("nativelib"),
-        debianRootfs = File(tmp.root, "runtime-current/base"),
-        nodeDir = File(tmp.root, "runtime-current/node"),
+        debianRootfs = File(tmp.root, "runtime-current/base").also { it.mkdirs() },
+        nodeDir = File(tmp.root, "runtime-current/node").also { it.mkdirs() },
+        dshDir = if (withDsh) File(tmp.root, "runtime-current/dsh").also { it.mkdirs() } else null,
         workspaceBind = tmp.newFolder("user-data"),
         prootTmpDir = tmp.newFolder("proot-tmp"),
         failsafeHome = tmp.newFolder("home"),
@@ -51,5 +52,19 @@ class TerminalCommandFactoryTest {
     @Test
     fun `failsafe command is plain system shell`() {
         assertEquals(listOf("/system/bin/sh"), TerminalCommandFactory.failsafeShell())
+    }
+
+    @Test
+    fun `sandbox command binds dsh layer when present`() {
+        val p = paths(withDsh = true)
+        val argv = TerminalCommandFactory.sandboxLoginShell(p)
+        assertTrue(argv.any { it == "--bind=${p.dshDir!!.absolutePath}:/opt/dshapp/runtime" })
+    }
+
+    @Test
+    fun `sandbox command skips dsh bind when layer is missing`() {
+        val p = paths(withDsh = false)
+        val argv = TerminalCommandFactory.sandboxLoginShell(p)
+        assertTrue(argv.none { it.contains("/opt/dshapp/runtime") })
     }
 }

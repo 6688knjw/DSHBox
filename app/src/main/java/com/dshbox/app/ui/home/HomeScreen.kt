@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,8 +50,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dshbox.app.BuildConfig
+import com.dshbox.app.DshApp
 import com.dshbox.app.R
 import com.dshbox.app.common.Constants
+import com.dshbox.app.common.DshUrls
 import com.dshbox.app.service.SandboxService
 import com.dshbox.app.ui.theme.AppIconsContentCopy
 import kotlinx.coroutines.delay
@@ -68,6 +71,11 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
 ) {
     val context = LocalContext.current
+    val launchToken by (context.applicationContext as DshApp)
+        .container.sandboxManager.dshLaunchToken.collectAsState()
+    val dshUrl = remember(launchToken) {
+        DshUrls.withLaunchToken(Constants.DSH_BASE_URL, launchToken)
+    }
     var showSandboxStopDialog by remember { mutableStateOf(false) }
     var showDshStopDialog by remember { mutableStateOf(false) }
     var dshNeedsSandboxToast by remember { mutableStateOf(false) }
@@ -154,12 +162,12 @@ fun HomeScreen(
             onRestart = { SandboxService.restartDsh(context) },
         )
 
-        AddressCard(context = context)
+        AddressCard(context = context, url = dshUrl)
 
         Button(
             shape = MaterialTheme.shapes.medium,
             onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(Constants.DSH_BASE_URL))
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(dshUrl))
                 context.startActivity(intent)
             },
             enabled = dshReady,
@@ -459,7 +467,7 @@ private fun DshStatusCard(
 }
 
 @Composable
-private fun AddressCard(context: Context) {
+private fun AddressCard(context: Context, url: String) {
     var copied by rememberSaveable { mutableStateOf(false) }
 
     Surface(
@@ -478,10 +486,12 @@ private fun AddressCard(context: Context) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = Constants.DSH_BASE_URL,
+                    text = url,
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = FontFamily.Monospace,
                     ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = stringResource(R.string.home_address_caption),
@@ -492,7 +502,7 @@ private fun AddressCard(context: Context) {
             IconButton(
                 onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("DSH URL", Constants.DSH_BASE_URL))
+                    clipboard.setPrimaryClip(ClipData.newPlainText("DSH URL", url))
                     copied = true
                     Toast.makeText(context, R.string.home_copied, Toast.LENGTH_SHORT).show()
                 },

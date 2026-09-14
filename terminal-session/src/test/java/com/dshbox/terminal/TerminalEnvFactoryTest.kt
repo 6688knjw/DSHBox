@@ -39,6 +39,8 @@ class TerminalEnvFactoryTest {
         assertEquals("/root", env["HOME"])
         assertEquals("xterm-256color", env["TERM"])
         assertTrue(env["PATH"]!!.contains("/usr/bin"))
+        assertTrue(env["PATH"]!!.contains("/opt/dshapp/runtime/node_modules/.bin"))
+        assertEquals("/root/projects/.dsh", env["DSH_HOME"])
         assertNotNull(env["LANG"])
         assertNotNull(env["TMPDIR"])
     }

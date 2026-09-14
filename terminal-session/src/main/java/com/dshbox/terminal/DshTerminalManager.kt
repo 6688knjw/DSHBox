@@ -188,9 +188,10 @@ class DshTerminalManager(
 
         val (command, env) = when (kind) {
             Kind.SANDBOX -> {
-                val procBinds = TerminalProcFake.ensureBindArgs(paths)
+                val extraBinds = TerminalProcFake.ensureBindArgs(paths) +
+                    TerminalDshCli.ensureBindArgs(paths)
                 val snippet = overlayInstaller?.prepare(paths)
-                TerminalCommandFactory.sandboxLoginShell(paths, snippet, procBinds) to
+                TerminalCommandFactory.sandboxLoginShell(paths, snippet, extraBinds) to
                     TerminalEnvFactory.sandboxEnv(paths)
             }
             Kind.FAILSAFE ->

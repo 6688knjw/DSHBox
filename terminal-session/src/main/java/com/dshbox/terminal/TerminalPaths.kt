@@ -19,6 +19,11 @@ data class TerminalPaths(
     val debianRootfs: File,
     /** L1 node layer, bound at the guest /usr/local (Node/npm live here). */
     val nodeDir: File,
+    /**
+     * L2 DSH layer, bound at the guest /opt/dshapp/runtime when present.
+     * Null or a missing directory means the terminal session has no DSH CLI.
+     */
+    val dshDir: File? = null,
     /** Host directory bound to /root/projects inside the guest. */
     val workspaceBind: File,
     /** PROOT_TMP_DIR for the terminal role; created on demand. */
