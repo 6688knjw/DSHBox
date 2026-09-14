@@ -87,6 +87,32 @@ jobs:
       - name: Run lint
         run: ./gradlew lintDebug --stacktrace
 
+      # 运行环境大层不进源码仓库（app/build.gradle.kts 引用 ../../runtime/android-assets）。
+      # release 变体从上游 v1.3.1 Release 取回三层与 DSH 层，组装进 assets，避免提交 190MB 二进制。
+      - name: Fetch bundled runtime (release)
+        if: inputs.variant == 'release'
+        run: |
+          set -euo pipefail
+          mkdir -p runtime/android-assets/runtime runtime/android-assets/dsh
+          BASE="https://github.com/WSK-build/DSHBox/releases/download/v1.3.1"
+          curl -sSL --retry 3 -o /tmp/rt.zip "$BASE/dshapp-runtime-debian-arm64-0.1.0.zip"
+          curl -sSL --retry 3 -o runtime/android-assets/dsh/0.1.5-rc.2.tar.zst "$BASE/0.1.5-rc.2.tar.zst"
+          unzip -q /tmp/rt.zip -d /tmp/rt
+          for layer in base node android-side; do
+            find /tmp/rt -name "$layer.tar*" ! -name '*.sha256' -exec cp {} runtime/android-assets/runtime/ \;
+            find /tmp/rt -name "$layer.tar*.sha256" -exec cp {} runtime/android-assets/runtime/ \;
+          done
+          find /tmp/rt -name 'runtime-profile.json' -exec cp {} runtime/android-assets/runtime/ \;
+          ( cd runtime/android-assets/dsh && sha256sum 0.1.5-rc.2.tar.zst > 0.1.5-rc.2.tar.zst.sha256 )
+          for layer in base node android-side; do
+            ls runtime/android-assets/runtime/$layer.tar* >/dev/null 2>&1 \
+              || { echo "::error::$layer layer not found in runtime zip"; find /tmp/rt -maxdepth 3 | head -60; exit 1; }
+          done
+          test -f runtime/android-assets/runtime/runtime-profile.json \
+            || { echo "::error::runtime-profile.json not found"; find /tmp/rt -maxdepth 3 | head -60; exit 1; }
+          echo "=== runtime ===" && ls -lh runtime/android-assets/runtime
+          echo "=== dsh ===" && ls -lh runtime/android-assets/dsh
+
       - name: Assemble APK
         run: ./gradlew assemble${{ inputs.variant == 'release' && 'Release' || 'Debug' }} --stacktrace
 
