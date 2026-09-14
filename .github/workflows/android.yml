@@ -87,34 +87,55 @@ jobs:
       - name: Run lint
         run: ./gradlew lintDebug --stacktrace
 
-      # 运行环境大层不进源码仓库（app/build.gradle.kts 引用 ../../runtime/android-assets）。
-      # release 变体从上游 v1.3.1 Release 取回三层与 DSH 层，组装进 assets，避免提交 190MB 二进制。
+      # 运行环境大层不进源码仓库。app/build.gradle.kts 的
+      # assets.srcDirs("../../runtime/android-assets") 相对 app/ 解析，落在
+      # <repo>/../runtime/android-assets（仓库同级目录）——放错位置时 Gradle
+      # 会静默忽略缺失目录，编出没有运行环境的包，故下方另有产物校验。
       - name: Fetch bundled runtime (release)
         if: inputs.variant == 'release'
         run: |
           set -euo pipefail
-          mkdir -p runtime/android-assets/runtime runtime/android-assets/dsh
+          RT="$GITHUB_WORKSPACE/../runtime/android-assets"
+          mkdir -p "$RT/runtime" "$RT/dsh"
           BASE="https://github.com/WSK-build/DSHBox/releases/download/v1.3.1"
-          curl -sSL --retry 3 -o $RUNNER_TEMP/rt.zip "$BASE/dshapp-runtime-debian-arm64-0.1.0.zip"
-          curl -sSL --retry 3 -o runtime/android-assets/dsh/0.1.5-rc.2.tar.zst "$BASE/0.1.5-rc.2.tar.zst"
-          unzip -q $RUNNER_TEMP/rt.zip -d $RUNNER_TEMP/rt
+          curl -sSL --retry 3 -o "$RUNNER_TEMP/rt.zip" "$BASE/dshapp-runtime-debian-arm64-0.1.0.zip"
+          curl -sSL --retry 3 -o "$RT/dsh/0.1.5-rc.2.tar.zst" "$BASE/0.1.5-rc.2.tar.zst"
+          unzip -q "$RUNNER_TEMP/rt.zip" -d "$RUNNER_TEMP/rt"
           for layer in base node android-side; do
-            find $RUNNER_TEMP/rt -name "$layer.tar*" ! -name '*.sha256' -exec cp {} runtime/android-assets/runtime/ \;
-            find $RUNNER_TEMP/rt -name "$layer.tar*.sha256" -exec cp {} runtime/android-assets/runtime/ \;
+            find "$RUNNER_TEMP/rt" -name "$layer.tar*" ! -name '*.sha256' -exec cp {} "$RT/runtime/" \;
+            find "$RUNNER_TEMP/rt" -name "$layer.tar*.sha256" -exec cp {} "$RT/runtime/" \;
           done
-          find $RUNNER_TEMP/rt -name 'runtime-profile.json' -exec cp {} runtime/android-assets/runtime/ \;
-          ( cd runtime/android-assets/dsh && sha256sum 0.1.5-rc.2.tar.zst > 0.1.5-rc.2.tar.zst.sha256 )
+          find "$RUNNER_TEMP/rt" -name 'runtime-profile.json' -exec cp {} "$RT/runtime/" \;
+          ( cd "$RT/dsh" && sha256sum 0.1.5-rc.2.tar.zst > 0.1.5-rc.2.tar.zst.sha256 )
           for layer in base node android-side; do
-            ls runtime/android-assets/runtime/$layer.tar* >/dev/null 2>&1 \
-              || { echo "::error::$layer layer not found in runtime zip"; find $RUNNER_TEMP/rt -maxdepth 3 | head -60; exit 1; }
+            ls "$RT/runtime/$layer.tar"* >/dev/null 2>&1 \
+              || { echo "::error::$layer layer not found in runtime zip"; find "$RUNNER_TEMP/rt" -maxdepth 3 | head -60; exit 1; }
           done
-          test -f runtime/android-assets/runtime/runtime-profile.json \
-            || { echo "::error::runtime-profile.json not found"; find $RUNNER_TEMP/rt -maxdepth 3 | head -60; exit 1; }
-          echo "=== runtime ===" && ls -lh runtime/android-assets/runtime
-          echo "=== dsh ===" && ls -lh runtime/android-assets/dsh
+          test -f "$RT/runtime/runtime-profile.json" \
+            || { echo "::error::runtime-profile.json not found"; find "$RUNNER_TEMP/rt" -maxdepth 3 | head -60; exit 1; }
+          echo "=== resolved assets dir: $RT ===" && ls -lh "$RT/runtime" "$RT/dsh"
 
       - name: Assemble APK
         run: ./gradlew assemble${{ inputs.variant == 'release' && 'Release' || 'Debug' }} --stacktrace
+
+      - name: Verify APK embeds runtime and DSH (release)
+        if: inputs.variant == 'release'
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          unzip -Z1 "$APK" > "$RUNNER_TEMP/apk_entries.txt"
+          for pat in \
+            'assets/runtime/base.tar' \
+            'assets/runtime/node.tar' \
+            'assets/runtime/android-side.tar' \
+            'assets/runtime/runtime-profile.json' \
+            'assets/dsh/0.1.5-rc.2.tar.zst'; do
+            grep -qF "$pat" "$RUNNER_TEMP/apk_entries.txt" \
+              || { echo "::error::$pat missing from APK (assets not embedded)"; exit 1; }
+          done
+          echo "APK size: $(du -h "$APK" | cut -f1)"
+          echo "runtime entries: $(grep -c 'assets/runtime/' "$RUNNER_TEMP/apk_entries.txt")"
+          echo "dsh entries: $(grep -c 'assets/dsh/' "$RUNNER_TEMP/apk_entries.txt")"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
