@@ -116,7 +116,36 @@ jobs:
           echo "=== resolved assets dir: $RT ===" && ls -lh "$RT/runtime" "$RT/dsh"
 
       - name: Assemble APK
-        run: ./gradlew assemble${{ inputs.variant == 'release' && 'Release' || 'Debug' }} --stacktrace
+        env:
+          VARIANT: ${{ inputs.variant || 'debug' }}
+        run: |
+          set -euo pipefail
+          if [ "$VARIANT" = "release" ]; then
+            # 内置运行环境：版本号加 -bundled 后缀以区分无内置构建
+            ./gradlew assembleRelease -PdshboxBundled=true --stacktrace
+          else
+            # 无内置：不加任何后缀，versionName 与上游一致
+            ./gradlew assembleDebug --stacktrace
+          fi
+
+      - name: Verify APK version name
+        env:
+          VARIANT: ${{ inputs.variant || 'debug' }}
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/$VARIANT/app-$VARIANT.apk"
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          AAPT=$(find "$SDK/build-tools" \( -name aapt2 -o -name aapt \) | sort -V | tail -1)
+          echo "using $AAPT"
+          ACTUAL=$("$AAPT" dump badging "$APK" | sed -n "s/^package:.*versionName='\([^']*\)'.*/\1/p")
+          echo "versionName=$ACTUAL (variant=$VARIANT)"
+          if [ "$VARIANT" = "release" ]; then
+            [ "$ACTUAL" = "1.3.1-bundled" ] \
+              || { echo "::error::内置版 versionName 应为 1.3.1-bundled，实际 $ACTUAL"; exit 1; }
+          else
+            [ "$ACTUAL" = "1.3.1" ] \
+              || { echo "::error::无内置版 versionName 应为 1.3.1，实际 $ACTUAL"; exit 1; }
+          fi
 
       - name: Verify APK embeds runtime and DSH (release)
         if: inputs.variant == 'release'

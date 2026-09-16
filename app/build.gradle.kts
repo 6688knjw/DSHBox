@@ -51,6 +51,12 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             buildConfigField("boolean", "ENABLE_WEBVIEW_DEBUGGING", "false")
             signingConfig = if (hasReleaseKeystore) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
+            // 内置运行环境的构建（CI 传 -PdshboxBundled=true）在版本号上加后缀，
+            // 与无内置构建区分；不传时 versionName 保持与上游完全一致。
+            // compareVersions() 以 '-' 截断，故应用内更新检测不受影响。
+            if (project.providers.gradleProperty("dshboxBundled").orNull == "true") {
+                versionNameSuffix = "-bundled"
+            }
         }
     }
 
